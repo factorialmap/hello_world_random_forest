@@ -21,5 +21,6 @@
 - No entendimento da mecanica por traz dos modelos preditivos cada vez mais utilizados por diversos tipos de negócio.
 
 ### Exemplos práticos ou de uso comercial
-  1. Será que vai haver recessão?
+  1. Teste A/B qual tela é mais amigável para os usuários?
+  2. Quais familias de produtos serão mais amados pelos clientes?
   
