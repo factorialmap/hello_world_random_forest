@@ -1,108 +1,84 @@
-#Chamar o famoso dataset Iris já incluso no R
-data("iris")
-attach(iris)  #Botar um attach pra não ter que digitar iris antes dos campos toda hora
+#Objetivos    ----
+#1. Como a partir de algumas característica representadas aqui como medidas eu consigo identificar qual a especie da planta?
+#2. Temos 3 espécis setosa, virginica e versicolor
+
+#pacotes
+library(tidyverse) #este nos ajuda no manuseio dos dados
+library(GGally) #mostras características atraves de um gráfico
+library(tidymodels) #este nos ajudará a construir o modelo
+library(randomForest) #as formulas do modelo estao neste
+library(randomForestExplainer) #se eu quiser explicar as decisões do modelo
+
+#dados        ----
+data("iris") #O conjunto de dados é nativo do R então basta chama-lo com a função data
+
+#Explorar dados (medianas, correlacao e distribuicao)
+iris %>% 
+  ggpairs(mapping = ggplot2::aes(colour = Species)) #mostra cada especie em uma cor
+
+#tradução dos dados para portugues
+#Sepal.Length  = comprimento da sepala
+#Sepal.Width   = largura da sepala
+#Petal.Length  = comprimento da petala
+#Petal.Width   = largura da petala
+
+#Estatística descritiva
+summary(iris) 
+
+# Apos compreender os dados e hora de pensar como eles podem ensinar e o que podemos aprender com ele
+# Temoos 4 variáveis preditoras numericas e 1 resposta categorica, logo o modelo deve ser de classificação
 
 
-#Dar um check nos dados
-str(iris)   #Semelhante ao DESC do Oracle ou SP_HELP no SQlSErver
-#Sepal.Length - comprimento da sepala
-#Sepal.Width - largura da sepala
-#Petal.Length - comprimento da petala
-#Petal.Width - largura da petala
-summary(iris) #ver as medias min max dados null etc
-boxplot(iris[-5]) #ver os outliers e amplitudes de variação iris[-5]já tirava a coluna 5 Species
+#modelo       ----
 
-# Apos compreender os dados e hora de pensar como eles podem ensinar o que podemos aprender com ele
-# A partir dai, determina-se qual o melhor metodo ou algoritimo a ser utilizado na analise
-# em busca daquilo que queremos
-# Para este caso utilizaremos o metodo de  classificao que faz parte da modelagem preditiva.
+#1º passo é dividir o conjunto em 2 uma partes pra fazer o modelo e outro pra testa-lo
 
-#Agora vamos dividir o dataset em 2 dataset de treino e o dataset de teste
+#70% pra treino e 30 pra teste
+iris_split <- initial_split(iris, prop = 0.7)
 
-#Criando numeros aleatorios
-set.seed(123)
-
-#chama o pacote catools que contem o algoritmo e a funcao split pra separar os dados
-#Criando uma coluna chamado it_train que vai levar TRUE dividindo em 70% train e 30% test
-library(caTools)
-library(randomForest)
-library(randomForestExplainer)
-
-#70% da coluna que criamos vai estar como TRUE indicando que ela é de treino
-iris$is_train <- sample.split(iris$Species, SplitRatio = 0.7) 
-
-#Checar se a coluna foi criada
-View(iris)
-
-#Agora chegou a hora de treinar e testar
-dados_treino <- subset(iris[-6], iris$is_train == T) #Train = TRUE
-dados_teste <- subset(iris[-6], iris$is_train == F) #Train = FALSE
+iris_train <- training(iris_split)
+iris_test  <- testing(iris_split)
 
 #Criar modelo colocando a variável Species contra todas as demais dos dados de treino com 50 arvores
 set.seed(1234)
-iris_random_f <- randomForest(Species ~., data = dados_treino, ntree=100, importance=T)
+modelo_rf <- 
+  randomForest(Species ~.,
+               data = iris_train,
+               ntree=100,
+               mtry = 4,
+               importance=TRUE)
 
 #Chama os resultados
-iris_random_f
+modelo_rf  #ja gera a matriz de confucao e o erro aproximado
 
 #Plota pra ver o ponto de estabilizacao
-plot(iris_random_f)
+plot(modelo_rf)  #a partir de 20 arvores o erro comeca a diminuir
 
-
-#Explicando Iris
-explain_forest(iris_random_f)
-
+#Ele gera um arquivo de explicacao e salva ali do lado direito em "file"
+explain_forest(modelo_rf)
 
 #Plot simples de  variaveis mais importantes
-varImpPlot(iris_random_f)
+varImpPlot(modelo_rf)
 
-#Fazer a predicao...note que usamos o modelo com dados que treinamos
-#e adicionamos um novo dado  pra ver se aprendemos
-iris_predict <- predict(iris_random_f, newdata = dados_teste)
+#predicao     ----
+
+#Usamos o modelo treinado + um dado novo, neste caso os dados de teste
+minha_previsao <- predict(modelo_rf, newdata = iris_test)
 
 #Criar uma coluna predicao com os resultados pra comparar com os dados que ja temos
-dados_teste$predicao <- iris_predict
+iris_test <- 
+  iris_test %>% 
+  mutate(dados_originais = Species,
+         dados_previstos = minha_previsao)
 
-#Visualiza a tabela, Species e o dado real e predicao e o dado que o modelo sugeriu
-View(dados_teste)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-###Fim
-
-
-
-
-
-
-
-
-
-
-#Montando a table
-table(iris_predict, dados_teste$Species)
-
+#Matriz de confusao na base de teste
+table(minha_previsao, iris_test$Species) #nosso modelo errou 2 previsoes em virginica
 
 #plotando a margem
-plot(margin(iris_random_f, dados_teste$Species))
+plot(margin(modelo_rf, dados_teste$Species))
 
-
-#Tunar o RF
-tune_random_f <- tuneRF(iris[,-5], iris[,5], stepFactor = 0.5)
+#Se eu quiser checar os parametros mtry pra melhorar o modelo
+tuneRF(iris[,-5], iris[,5], stepFactor = 0.5) #4 é o melhor valor
 
 
 
